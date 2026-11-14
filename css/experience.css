@@ -124,3 +124,19 @@ body{background:var(--paper)}
 @media(max-width:420px){.brand{font-size:25px}.hero h1{font-size:58px}.hero-text{font-size:13px;max-width:295px}.hero .eyebrow{font-size:7px;letter-spacing:.12em;gap:0}.hero .eyebrow:after{width:24px;margin-left:8px}.hero-visual{height:365px;margin-top:15px}.hero-notebook{height:244px;top:43px;left:4%;width:54%}.hero-bottle{height:194px;right:2%;top:10px}.hero-lamp{height:125px;right:2%;bottom:53px}.hero-product{border-width:5px;border-radius:10px}.hero-product-caption{font-size:6px;padding:6px}.curated-stamp{width:75px;height:75px;bottom:63px;right:28%}.curated-stamp strong{font-size:24px}.curated-stamp span:first-child{font-size:8px}.curated-stamp span:last-child{font-size:4px}.hero-feature{padding:12px;gap:9px;left:5%;right:5%;bottom:-1px}.hero-feature strong{font-size:9px}.hero-feature small{font-size:7px}.hero-feature .mini-icon{width:29px;height:29px}.hero-feature .mini-icon .icon{width:18px}.hero-feature>span:last-child{font-size:20px}.section-heading h2{font-size:30px}.section-heading>.text-link{margin-top:13px}.product-card{padding:7px 7px 12px;border-radius:13px}.product-info h3{font-size:13px;line-height:1.35;min-height:36px}.product-description{font-size:9px;min-height:29px}.product-category{font-size:7px;margin-bottom:4px}.product-badge{font-size:6px;padding:4px 5px;left:6px;top:7px;max-width:76px}.save-button{right:6px;top:6px;width:25px;height:25px}.save-button .icon{width:13px}.price{font-size:11px}.price small{font-size:7px}.add-button{width:28px;height:28px}.product-bottom{padding-top:10px}.kit-section{padding:23px}.kit-intro h2{font-size:34px}.kit-builder{padding:17px}.kit-intro .eyebrow{font-size:6px}.kit-item span{font-size:9px}.kit-item img{height:60px}.kit-total strong{font-size:11px}.kit-total button{font-size:9px;padding:9px}.kit-total p{font-size:8px}.page-heading h1{font-size:48px}.page-heading .eyebrow{font-size:8px}.about-hero h1{font-size:44px}.about-hero img{height:270px}.contact-main{padding:20px 16px}.mode-tabs{gap:18px}.mode-tabs button{font-size:11px}.form-heading h2{font-size:24px}.small-banner h2{font-size:25px}.footer-signature{font-size:18vw}.button{font-size:11px;padding:14px 20px}.hero .button-row{gap:22px}.hero .text-link{font-size:10px}}
 .motion-off *, .motion-off *::before, .motion-off *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}.hero-product{will-change:auto}}
+
+.shop-toast.stock-warning {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: white;
+}
+.shop-toast.stock-warning::before {
+  content: '!';
+  color: inherit;
+  font-weight: 700;
+}
+.cart-item .stock-limit-note {
+  margin-top: 5px;
+  color: var(--danger);
+  font-weight: 600;
+}

@@ -30,11 +30,11 @@ const BagaShop = (() => {
   function deliveryCost(method = 'delivery') { return !cart.length || method === 'pickup' || subtotal() >= 15000 ? 0 : 1000; }
   function isSaved(id) { return saved.includes(id); }
   function savedCount() { return saved.length; }
-  function showToast(message) {
+  function showToast(message, type = 'success') {
     const toast = $('#toast');
     const activeDialog = document.querySelector('dialog[open]');
     (activeDialog || document.body).appendChild(toast[0]);
-    toast.stop(true, true).text(message).fadeIn(160).delay(2200).fadeOut(200);
+    toast.stop(true, true).toggleClass('stock-warning', type === 'limit').text(message).fadeIn(160).delay(2200).fadeOut(200);
   }
   function saveCart() {
     writeStorage('bagashop-cart', cart);
@@ -47,25 +47,31 @@ const BagaShop = (() => {
     const item = cart.find(item => item.id === id);
     const current = item ? item.quantity : 0;
     if (current + quantity > product.stock) {
-      showToast('Only ' + product.stock + ' ' + product.name.toLowerCase() + ' items are available in this demo.');
+      showToast(product.name + ': limit ' + product.stock + '. Already in your bag: ' + current + '.', 'limit');
       return false;
     }
     document.dispatchEvent(new CustomEvent('productadded', { detail: { id } }));
     if (item) item.quantity += quantity;
     else cart.push({ id, quantity });
     saveCart();
-    showToast(product.name + ' added to your bag.');
+    if (current + quantity === product.stock) {
+      showToast(product.name + ' added. Stock limit reached (' + product.stock + ').', 'limit');
+    } else {
+      showToast(product.name + ' added to your bag.');
+    }
     return true;
   }
   function addKit(ids) {
     const selected = ids.map(id => products.find(product => product.id === id));
     if (!selected.length || selected.some(product => !product)) return;
+    const reachedLimit = [];
     for (const product of selected) {
       const quantity = cart.find(item => item.id === product.id)?.quantity || 0;
       if (quantity >= product.stock) {
-        showToast('Your bag already has the available stock of ' + product.name + '.');
+        showToast('Kit could not be added. Stock limit reached for ' + product.name + '.', 'limit');
         return;
       }
+      if (quantity + 1 === product.stock) reachedLimit.push(product.name);
     }
     for (const product of selected) {
       const item = cart.find(item => item.id === product.id);
@@ -73,7 +79,11 @@ const BagaShop = (() => {
       else cart.push({ id: product.id, quantity: 1 });
     }
     saveCart();
-    showToast('Your everyday kit is in the bag.');
+    if (reachedLimit.length) {
+      showToast('Kit added. Stock limit reached for ' + reachedLimit.join(', ') + '.', 'limit');
+    } else {
+      showToast('Your everyday kit is in the bag.');
+    }
   }
   function clearCart() { cart = []; saveCart(); }
   function toggleSaved(id) {
@@ -119,7 +129,22 @@ const BagaShop = (() => {
       summary.innerHTML = '';
       return;
     }
-    container.innerHTML = getItems().map(item => `<article class="cart-item"><img src="${item.image}" alt="${item.name}" width="68" height="85"><div><h3>${item.name}</h3><p>${money(item.price)} each</p><div class="quantity-controls"><button type="button" data-quantity="${item.id}" data-step="-1" aria-label="Decrease ${item.name} quantity" ${item.quantity <= 1 ? 'disabled' : ''}>−</button><span aria-label="Quantity">${item.quantity}</span><button type="button" data-quantity="${item.id}" data-step="1" aria-label="Increase ${item.name} quantity" ${item.quantity >= item.stock ? 'disabled' : ''}>+</button></div></div><div><span class="price">${money(item.price * item.quantity)}</span><button class="remove-button" type="button" data-remove="${item.id}" aria-label="Remove ${item.name}">Remove</button></div></article>`).join('');
+    container.innerHTML = getItems().map(item => {
+      const atLimit = item.quantity >= item.stock;
+      return `<article class="cart-item">
+        <img src="${item.image}" alt="${item.name}" width="68" height="85">
+        <div>
+          <h3>${item.name}</h3><p>${money(item.price)} each</p>
+          <div class="quantity-controls">
+            <button type="button" data-quantity="${item.id}" data-step="-1" aria-label="Decrease ${item.name} quantity" ${item.quantity <= 1 ? 'disabled' : ''}>−</button>
+            <span aria-label="Quantity">${item.quantity}</span>
+            <button type="button" data-quantity="${item.id}" data-step="1" aria-label="Increase ${item.name} quantity" ${atLimit ? 'disabled' : ''}>+</button>
+          </div>
+          ${atLimit ? '<p class="stock-limit-note">Stock limit reached (' + item.stock + ').</p>' : ''}
+        </div>
+        <div><span class="price">${money(item.price * item.quantity)}</span><button class="remove-button" type="button" data-remove="${item.id}" aria-label="Remove ${item.name}">Remove</button></div>
+      </article>`;
+    }).join('');
     const remainder = Math.max(0, 15000 - subtotal());
     summary.innerHTML = `<div class="delivery-progress" aria-hidden="true"><span style="width:${Math.min(100, subtotal() / 15000 * 100)}%"></span></div><p class="delivery-message">${remainder ? 'You’re ' + money(remainder) + ' away from free delivery.' : 'Your bag qualifies for free delivery.'}</p><div class="summary-line"><span>Subtotal</span><span>${money(subtotal())}</span></div><div class="summary-line"><span>Standard delivery</span><span>${money(deliveryCost())}</span></div><div class="summary-line summary-total"><span>Total</span><span>${money(subtotal() + deliveryCost())}</span></div><a class="button checkout-link" href="contact.html?mode=order">Continue to checkout <span>→</span></a><p class="cart-demo-note">Demo checkout · No payment required</p>`;
   }
@@ -168,6 +193,11 @@ const BagaShop = (() => {
       if (item && item.quantity + step >= 1 && item.quantity + step <= product.stock) {
         item.quantity += step;
         saveCart();
+        if (item.quantity === product.stock) {
+          showToast(product.name + ': stock limit reached (' + product.stock + ').', 'limit');
+        } else {
+          $('#toast.stock-warning').stop(true, true).hide();
+        }
         const replacement = document.querySelector('[data-quantity="' + id + '"][data-step="' + step + '"]');
         if (!replacement.disabled) replacement.focus();
         else document.querySelector('[data-quantity="' + id + '"][data-step="' + -step + '"]').focus();
