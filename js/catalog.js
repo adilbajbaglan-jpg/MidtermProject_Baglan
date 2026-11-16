@@ -39,6 +39,14 @@
   savedOnly.addEventListener('change', updateCatalog);
   document.querySelectorAll('[data-category]').forEach(button => button.addEventListener('click', () => { category = button.dataset.category; updateCatalog(); }));
   document.querySelectorAll('#reset-filters, [data-reset-filters]').forEach(button => button.addEventListener('click', resetFilters));
-  document.addEventListener('savedchange', updateCatalog);
+  document.addEventListener('savedchange', () => {
+    if (savedOnly.checked) {
+      updateCatalog();
+      const next = document.querySelector('#product-grid [data-save]') || savedOnly;
+      next.focus({ preventScroll: true });
+    } else {
+      document.getElementById('saved-count').textContent = BagaShop.savedCount();
+    }
+  });
   updateCatalog();
 })();

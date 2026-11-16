@@ -18,8 +18,9 @@
     });
     if (!enabled) {
       document.getAnimations().forEach(animation => animation.cancel());
-      document.querySelectorAll('.bag-flight, .click-ripple').forEach(element => element.remove());
+      document.querySelectorAll('.bag-flight').forEach(element => element.remove());
     }
+    document.dispatchEvent(new CustomEvent('motionchange'));
   }
   document.querySelectorAll('.motion-toggle').forEach(button => button.addEventListener('click', () => {
     userMotion = !userMotion;
@@ -48,14 +49,40 @@
     elements.forEach((element, index) => {
       if (observed.has(element)) return;
       observed.add(element);
-      element.dataset.revealDelay = Math.min(index % 4, 3) * 65;
+      element.dataset.revealDelay = (index % 4) * 45;
       if (observer) observer.observe(element);
       else reveal(element);
     });
   }
-  observeElements(document.querySelectorAll('.hero-copy > *, .section-heading, .story-banner > div, .kit-intro, .kit-builder, .page-heading > *, .about-hero > *, .values-grid article, .faq-item, .credits-grid > div, .contact-main, .contact-sidebar, .small-banner'));
+  observeElements(document.querySelectorAll('.hero-copy > .eyebrow, .hero-copy > .hero-text, .hero-copy > .button-row, .section-heading, .story-banner > div, .kit-intro, .kit-builder, .page-heading > *, .about-hero > *, .values-grid article, .faq-item, .credits-grid > div, .contact-main, .contact-sidebar, .small-banner'));
   observeElements(document.querySelectorAll('.product-card'));
-  document.addEventListener('productsrendered', event => observeElements(event.detail.container.querySelectorAll('.product-card')));
+  let previousCards = new Map();
+  document.addEventListener('productsrendering', event => {
+    previousCards.clear();
+    if (!motionEnabled()) return;
+    for (const card of event.detail.container.children) {
+      previousCards.set(card.dataset.productId, card.getBoundingClientRect());
+    }
+  });
+  document.addEventListener('productsrendered', event => {
+    const entering = [];
+    for (const card of event.detail.container.children) {
+      const previous = previousCards.get(card.dataset.productId);
+      if (previous && motionEnabled()) {
+        const current = card.getBoundingClientRect();
+        const dx = previous.left - current.left;
+        const dy = previous.top - current.top;
+        if (Math.abs(dx) + Math.abs(dy) > 2) {
+          card.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }],
+            { duration: 340, easing: 'cubic-bezier(.22,1,.36,1)' });
+        }
+      } else {
+        entering.push(card);
+      }
+    }
+    observeElements(entering);
+    previousCards.clear();
+  });
   let scrollFrame = 0;
   const progress = document.querySelector('.reading-progress span');
   const header = document.querySelector('.site-header');
@@ -79,20 +106,6 @@
   let addTrigger = null;
   document.addEventListener('click', event => {
     addTrigger = event.target.closest('[data-add]');
-    const button = event.target.closest('.button, .filter-pill, .add-button');
-    if (!button || !motionEnabled() || event.detail === 0) return;
-    const bounds = button.getBoundingClientRect();
-    const size = Math.max(bounds.width, bounds.height) * 2;
-    const ripple = document.createElement('span');
-    ripple.className = 'click-ripple';
-    ripple.setAttribute('aria-hidden', 'true');
-    ripple.style.width = size + 'px';
-    ripple.style.height = size + 'px';
-    ripple.style.left = event.clientX - bounds.left - size / 2 + 'px';
-    ripple.style.top = event.clientY - bounds.top - size / 2 + 'px';
-    button.appendChild(ripple);
-    ripple.addEventListener('animationend', () => ripple.remove(), { once: true });
-    window.setTimeout(() => ripple.remove(), 750);
   }, true);
   document.addEventListener('productadded', event => {
     if (!motionEnabled() || !addTrigger) return;
@@ -123,12 +136,30 @@
     ], { duration: 650, easing: 'cubic-bezier(.4,0,.2,1)' });
     animation.finished.then(() => { flight.remove(); pulse(target, 1.08); }).catch(() => flight.remove());
   });
-  document.addEventListener('cartchange', () => {
+  document.addEventListener('cartchange', event => {
+    if (motionEnabled() && event.detail?.quantityId) {
+      const button = document.querySelector('[data-quantity="' + event.detail.quantityId + '"]');
+      const value = button?.parentElement.querySelector('span');
+      value?.animate([
+        { transform: 'translateY(' + (event.detail.step > 0 ? 7 : -7) + 'px)', opacity: .35 },
+        { transform: 'translateY(0)', opacity: 1 }
+      ], { duration: 250, easing: 'ease-out' });
+      pulse(document.querySelector('#cart-summary .summary-total span:last-child'), 1.06);
+    }
     document.querySelectorAll('.cart-count').forEach(element => pulse(element, 1.3));
     requestScrollUpdate();
   });
-  document.addEventListener('savedchange', () => {
-    document.querySelectorAll('.save-button[aria-pressed=true]').forEach(element => pulse(element, 1.16));
+  document.addEventListener('savedchange', event => {
+    const button = document.querySelector('[data-save="' + event.detail.id + '"]');
+    pulse(button?.querySelector('svg'), 1.4);
+    if (motionEnabled() && button?.getAttribute('aria-pressed') === 'true') {
+      const ring = document.createElement('span');
+      ring.className = 'heart-ring';
+      ring.setAttribute('aria-hidden', 'true');
+      button.appendChild(ring);
+      ring.animate([{ transform: 'scale(.68)', opacity: .95 }, { transform: 'scale(1.65)', opacity: 0 }],
+        { duration: 400, easing: 'ease-out' }).finished.finally(() => ring.remove()).catch(() => {});
+    }
     requestScrollUpdate();
   });
 })();

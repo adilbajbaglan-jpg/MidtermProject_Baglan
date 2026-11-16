@@ -36,10 +36,10 @@ const BagaShop = (() => {
     (activeDialog || document.body).appendChild(toast[0]);
     toast.stop(true, true).toggleClass('stock-warning', type === 'limit').text(message).fadeIn(160).delay(2200).fadeOut(200);
   }
-  function saveCart() {
+  function saveCart(change = {}) {
     writeStorage('bagashop-cart', cart);
     renderCart();
-    document.dispatchEvent(new CustomEvent('cartchange'));
+    document.dispatchEvent(new CustomEvent('cartchange', { detail: change }));
   }
   function addItem(id, quantity = 1) {
     const product = products.find(product => product.id === id);
@@ -94,7 +94,7 @@ const BagaShop = (() => {
       button.setAttribute('aria-label', (isSaved(id) ? 'Unsave ' : 'Save ') + products.find(product => product.id === id).name);
     });
     showToast(isSaved(id) ? 'Saved for later.' : 'Removed from saved products.');
-    document.dispatchEvent(new CustomEvent('savedchange'));
+    document.dispatchEvent(new CustomEvent('savedchange', { detail: { id } }));
   }
   function productCard(product) {
     const card = document.createElement('article');
@@ -110,10 +110,10 @@ const BagaShop = (() => {
     return card;
   }
   function renderProducts(container, items) {
+    document.dispatchEvent(new CustomEvent('productsrendering', { detail: { container } }));
     container.replaceChildren();
-    for (const [index, product] of items.entries()) {
+    for (const product of items) {
       const card = productCard(product);
-      card.style.setProperty('--item-delay', Math.min(index, 5) * 55 + 'ms');
       container.appendChild(card);
     }
     document.dispatchEvent(new CustomEvent('productsrendered', { detail: { container } }));
@@ -155,20 +155,51 @@ const BagaShop = (() => {
     dialog.showModal();
     document.body.style.overflow = 'hidden';
   }
+  function cardPose(dialog) {
+    const card = lastTrigger?.closest('.product-card');
+    const source = card?.querySelector('.product-image');
+    if (!source || window.innerWidth < 650 || !document.documentElement.classList.contains('motion-enabled')) return null;
+    const from = source.getBoundingClientRect();
+    if (from.bottom <= 0 || from.top >= window.innerHeight) return null;
+    const to = dialog.getBoundingClientRect();
+    const x = from.left + from.width / 2 - to.left - to.width / 2;
+    const y = from.top + from.height / 2 - to.top - to.height / 2;
+    const scale = Math.min(.85, Math.max(.32, from.width / to.width));
+    return `translate(${x}px, ${y}px) scale(${scale})`;
+  }
+
   function closeDialog(dialog) {
     if (!dialog.open || dialog.classList.contains('is-closing')) return;
-    if (document.documentElement.classList.contains('motion-off') || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    if (!document.documentElement.classList.contains('motion-enabled')) {
       dialog.close();
       return;
     }
+    dialog.getAnimations().filter(animation => animation.effect?.target === dialog).forEach(animation => animation.cancel());
+    const pose = dialog.classList.contains('from-card') ? cardPose(dialog) : null;
     dialog.classList.add('is-closing');
-    window.setTimeout(() => { dialog.close(); dialog.classList.remove('is-closing'); }, 180);
+    function finish() {
+      dialog.close();
+      dialog.classList.remove('is-closing', 'from-card');
+    }
+    if (pose) {
+      dialog.animate([{ transform: 'none', opacity: 1 }, { transform: pose, opacity: 0 }],
+        { duration: 235, easing: 'cubic-bezier(.43,.04,.82,.56)' }).finished.then(finish, finish);
+    } else {
+      window.setTimeout(finish, 180);
+    }
   }
   function showProduct(id, trigger) {
     const product = products.find(product => product.id === id);
     if (!product) return;
     document.getElementById('product-detail').innerHTML = `<div class="product-detail-grid"><div class="detail-gallery"><img id="gallery-image" src="${product.image}" alt="${product.name}" width="700" height="640"><div class="gallery-options" role="group" aria-label="Product image view"><button class="active" type="button" data-gallery="full" aria-pressed="true">Full view</button><button type="button" data-gallery="detail" aria-pressed="false">Closer look</button></div></div><div class="detail-copy"><p class="eyebrow">${product.category.toUpperCase()} ESSENTIALS</p><h2 id="product-title">${product.name}</h2><p>${product.description}</p><p class="price">${money(product.price)}</p><ul>${product.details.map(detail => '<li>' + detail + '</li>').join('')}</ul><p>${product.stock} available in the demo collection</p><button class="button" type="button" data-add="${product.id}">Add to bag ${icons.plus}</button><p class="summary-note">Illustrative product photo. This is a student demo.</p></div></div>`;
+    const dialog = document.getElementById('product-dialog');
+    dialog.classList.toggle('from-card', Boolean(trigger.closest('.product-card') && window.innerWidth >= 650));
     openDialog('product-dialog', trigger);
+    const pose = cardPose(dialog);
+    if (pose) {
+      dialog.animate([{ transform: pose, opacity: .12 }, { transform: 'none', opacity: 1 }],
+        { duration: 430, easing: 'cubic-bezier(.19,.85,.21,1)' });
+    }
   }
   document.addEventListener('click', event => {
     const button = event.target.closest('button');
@@ -192,7 +223,7 @@ const BagaShop = (() => {
       const step = Number(button.dataset.step);
       if (item && item.quantity + step >= 1 && item.quantity + step <= product.stock) {
         item.quantity += step;
-        saveCart();
+        saveCart({ quantityId: id, step });
         if (item.quantity === product.stock) {
           showToast(product.name + ': stock limit reached (' + product.stock + ').', 'limit');
         } else {
